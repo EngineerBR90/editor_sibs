@@ -161,6 +161,7 @@ st.markdown("Arraste arquivos `.xls` ou `.xlsx` para cá, ou selecione pela caix
 
 with st.expander("Instruções rápidas"):
     st.write("""- Você pode enviar vários arquivos ao mesmo tempo.
+- Faça o upload dos arquivos do jeito que o SIBS exporta (Imprimir orçamento > Orçamento resumo > Exportar .xls) 
 - Se enviar mais de um arquivo, o download será entregue em um ZIP.
 - Os arquivos resultantes terão o sufixo `_LIMPO.xlsx`.
 - Use a opção 'Aplicar filtros para faturamento direto?' se quiser uma aba específica com apenas os itens que contenham 'mil' ou 'sod' no campo Item.
@@ -223,3 +224,4 @@ else:
         st.info("Nenhum arquivo carregado ainda.")
 
 # Fim do arquivo
+
