@@ -94,7 +94,7 @@ def aplicar_formatacao_bytes(buffer_bytes, aplicar_filtros=False):
                 except Exception:
                     pass
 
-            # Se não for planilha de faturamento, adiciona uma soma rápida ao final (apenas na primeira planilha)
+        # Adiciona uma soma rápida na primeira planilha (caso aplicável)
         try:
             ws0 = workbook.worksheets[0]
             ultima_linha = ws0.max_row
@@ -160,10 +160,11 @@ st.title("Limpador de planilhas SIBS")
 st.markdown("Arraste arquivos `.xls` ou `.xlsx` para cá, ou selecione pela caixa abaixo. O app retorna os arquivos já limpos prontos para download.")
 
 with st.expander("Instruções rápidas"):
-    st.write("- Você pode enviar vários arquivos ao mesmo tempo.
+    st.write("""- Você pode enviar vários arquivos ao mesmo tempo.
 - Se enviar mais de um arquivo, o download será entregue em um ZIP.
 - Os arquivos resultantes terão o sufixo `_LIMPO.xlsx`.
-- Use a opção 'Aplicar filtros para faturamento direto?' se quiser uma aba específica com apenas os itens que contenham 'mil' ou 'sod' no campo Item.")
+- Use a opção 'Aplicar filtros para faturamento direto?' se quiser uma aba específica com apenas os itens que contenham 'mil' ou 'sod' no campo Item.
+""")
 
 uploaded_files = st.file_uploader("Escolha os arquivos (.xls / .xlsx)", type=['xls', 'xlsx'], accept_multiple_files=True)
 
