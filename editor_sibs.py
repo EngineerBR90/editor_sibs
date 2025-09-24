@@ -56,46 +56,56 @@ def limpar_arquivo_bytesio(uploaded_file):
         return None
 
 
-def aplicar_formatacao_bytes(buffer_bytes):
-    """Recebe bytes de um arquivo .xlsx em memória, aplica formatação simples e retorna bytes atualizados"""
+def aplicar_formatacao_bytes(buffer_bytes, aplicar_filtros=False):
+    """Recebe bytes de um arquivo .xlsx em memória, aplica formatação simples e retorna bytes atualizados.
+    Se aplicar_filtros=True, também cria um AutoFilter na planilha 'Faturamento' (caso exista)."""
     try:
         in_mem = io.BytesIO(buffer_bytes)
         workbook = load_workbook(filename=in_mem)
-        ws = workbook.active
 
-        # Formatação mínima: formatos numéricos e soma
-        for row in range(2, ws.max_row + 1):
-            # Quantidade -> coluna A
-            cell_a = ws[f'A{row}']
-            try:
-                cell_a.number_format = '0.00'
-            except Exception:
-                pass
-            # Unitário -> coluna C
-            try:
-                ws[f'C{row}'].number_format = '"R$" #,##0.00'
-            except Exception:
-                pass
-            # Total -> coluna D
-            try:
-                ws[f'D{row}'].number_format = '"R$" #,##0.00'
-            except Exception:
-                pass
+        # Aplica formatação básica em todas as planilhas dataframes (geralmente 'Todos' e/ou 'Faturamento')
+        for ws in workbook.worksheets:
+            # Formatação mínima: formatos numéricos
+            for row in range(2, ws.max_row + 1):
+                try:
+                    ws[f'A{row}'].number_format = '0.00'
+                except Exception:
+                    pass
+                try:
+                    ws[f'C{row}'].number_format = '"R$" #,##0.00'
+                except Exception:
+                    pass
+                try:
+                    ws[f'D{row}'].number_format = '"R$" #,##0.00'
+                except Exception:
+                    pass
 
-        ultima_linha = ws.max_row
-        soma_linha = ultima_linha + 1
-        ws[f'C{soma_linha}'] = 'Total'
-        ws[f'C{soma_linha}'].font = Font(bold=True)
-        ws[f'D{soma_linha}'] = f'=SUM(D2:D{ultima_linha})'
-        ws[f'D{soma_linha}'].font = Font(bold=True)
-        ws[f'D{soma_linha}'].number_format = '"R$" #,##0.00'
+            # Ajuste de largura simples
+            for col in ['A', 'B', 'C', 'D']:
+                try:
+                    ws.column_dimensions[col].width = 20
+                except Exception:
+                    pass
 
-        # Ajuste de largura simples
-        for col in ['A', 'B', 'C', 'D']:
-            try:
-                ws.column_dimensions[col].width = 20
-            except Exception:
-                pass
+            # Se for a planilha de faturamento e o usuário requisitou filtros, cria AutoFilter na linha 1
+            if aplicar_filtros and ws.title.lower().startswith('fatur'):
+                try:
+                    ws.auto_filter.ref = f"A1:D{ws.max_row}"
+                except Exception:
+                    pass
+
+            # Se não for planilha de faturamento, adiciona uma soma rápida ao final (apenas na primeira planilha)
+        try:
+            ws0 = workbook.worksheets[0]
+            ultima_linha = ws0.max_row
+            soma_linha = ultima_linha + 1
+            ws0[f'C{soma_linha}'] = 'Total'
+            ws0[f'C{soma_linha}'].font = Font(bold=True)
+            ws0[f'D{soma_linha}'] = f'=SUM(D2:D{ultima_linha})'
+            ws0[f'D{soma_linha}'].font = Font(bold=True)
+            ws0[f'D{soma_linha}'].number_format = '"R$" #,##0.00'
+        except Exception:
+            pass
 
         out_mem = io.BytesIO()
         workbook.save(out_mem)
@@ -103,40 +113,63 @@ def aplicar_formatacao_bytes(buffer_bytes):
         return out_mem.read()
 
     except Exception as e:
-        # Se algo falhar na formatação, devolve os bytes originais
         st.warning(f"Formatação falhou: {e}")
         return buffer_bytes
 
 
-def salvar_dataframe_para_bytes(df, aplicar_formatacao=True):
-    """Salva um DataFrame para bytes (.xlsx). Se aplicar_formatacao=True, tenta aplicar formatação openpyxl."""
+def salvar_dataframe_para_bytes(df, aplicar_formatacao=True, aplicar_filtros=False):
+    """Salva um DataFrame para bytes (.xlsx).
+    Se aplicar_filtros=True, cria duas planilhas: 'Todos' (com todos os registros) e 'Faturamento' (apenas linhas onde Item contém 'mil' ou 'sod').
+    Essa abordagem mantém todos os dados enquanto oferece uma aba já preparada para faturamento direto.
+    """
     buf = io.BytesIO()
-    df.to_excel(buf, index=False, engine='openpyxl')
-    buf.seek(0)
-    data = buf.read()
 
-    if aplicar_formatacao:
-        try:
-            data = aplicar_formatacao_bytes(data)
-        except Exception:
-            pass
+    if aplicar_filtros:
+        # Escrever duas sheets: Todos e Faturamento (filtrada)
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Todos', index=False)
+            # Filtrar por 'mil' ou 'sod' em Item (coluna B)
+            try:
+                mask = df['Item'].astype(str).str.contains(r'mil|sod', case=False, na=False)
+                df_filtered = df[mask]
+            except Exception:
+                df_filtered = df.iloc[0:0]  # vazio, se algo falhar
+            df_filtered.to_excel(writer, sheet_name='Faturamento', index=False)
+        buf.seek(0)
+        data = buf.read()
 
-    return data
+        if aplicar_formatacao:
+            data = aplicar_formatacao_bytes(data, aplicar_filtros=True)
+
+        return data
+
+    else:
+        df.to_excel(buf, index=False, engine='openpyxl')
+        buf.seek(0)
+        data = buf.read()
+
+        if aplicar_formatacao:
+            data = aplicar_formatacao_bytes(data, aplicar_filtros=False)
+
+        return data
 
 
 # ---------- UI Streamlit ----------
 
-st.title("Limpador de SIBS")
-st.markdown("Arraste arquivos `.xls` para cá, ou selecione pela caixa abaixo. O app retorna os arquivos já limpos prontos para download.")
+st.title("Limpador de planilhas SIBS")
+st.markdown("Arraste arquivos `.xls` ou `.xlsx` para cá, ou selecione pela caixa abaixo. O app retorna os arquivos já limpos prontos para download.")
 
 with st.expander("Instruções rápidas"):
-    st.write("- Faça o upload dos arquivos do jeito que o SIBS exporta (Imprimir orçamento > Orçamento resumo > Exportar .xls). \n- Você pode enviar vários arquivos ao mesmo tempo.\n- Se enviar mais de um arquivo, o download será entregue em um ZIP.\n- Os arquivos resultantes terão o sufixo `_LIMPO.xlsx`.")
+    st.write("- Você pode enviar vários arquivos ao mesmo tempo.
+- Se enviar mais de um arquivo, o download será entregue em um ZIP.
+- Os arquivos resultantes terão o sufixo `_LIMPO.xlsx`.
+- Use a opção 'Aplicar filtros para faturamento direto?' se quiser uma aba específica com apenas os itens que contenham 'mil' ou 'sod' no campo Item.")
 
-uploaded_files = st.file_uploader("Escolha os arquivos (.xls)", type=['xls', 'xlsx'], accept_multiple_files=True)
+uploaded_files = st.file_uploader("Escolha os arquivos (.xls / .xlsx)", type=['xls', 'xlsx'], accept_multiple_files=True)
 
 col1, col2 = st.columns([3,1])
 with col2:
-    aplicar_format = st.checkbox("Aplicar formatação", value=True)
+    aplicar_filtros = st.checkbox("Aplicar filtros para faturamento direto?", value=False)
     btn_processar = st.button("Processar arquivos")
 
 if btn_processar and uploaded_files:
@@ -153,7 +186,8 @@ if btn_processar and uploaded_files:
             status.error(f"Falha ao processar {up.name} - formato inesperado ou ausência de dados detectada.")
             continue
 
-        data_bytes = salvar_dataframe_para_bytes(df_limpo, aplicar_formatacao=aplicar_format)
+        # Gerar bytes do arquivo final. Sempre aplicamos formatação mínima automaticamente.
+        data_bytes = salvar_dataframe_para_bytes(df_limpo, aplicar_formatacao=True, aplicar_filtros=aplicar_filtros)
         filename_out = up.name.rsplit('.', 1)[0] + '_LIMPO.xlsx'
         resultados.append((filename_out, data_bytes, df_limpo))
 
@@ -188,4 +222,3 @@ else:
         st.info("Nenhum arquivo carregado ainda.")
 
 # Fim do arquivo
-
