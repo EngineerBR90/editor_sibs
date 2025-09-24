@@ -126,13 +126,13 @@ def salvar_dataframe_para_bytes(df, aplicar_formatacao=True):
 
 # ---------- UI Streamlit ----------
 
-st.title("Limpador de planilhas SIBS")
-st.markdown("Arraste arquivos `.xls` ou `.xlsx` para cá, ou selecione pela caixa abaixo. O app retorna os arquivos já limpos prontos para download.")
+st.title("Limpador de SIBS")
+st.markdown("Arraste arquivos `.xls` para cá, ou selecione pela caixa abaixo. O app retorna os arquivos já limpos prontos para download.")
 
 with st.expander("Instruções rápidas"):
-    st.write("- Você pode enviar vários arquivos ao mesmo tempo.\n- Se enviar mais de um arquivo, o download será entregue em um ZIP.\n- Os arquivos resultantes terão o sufixo `_LIMPO.xlsx`.")
+    st.write("- Faça o upload dos arquivos do jeito que o SIBS exporta (Imprimir orçamento > Orçamento resumo > Exportar .xls). \n- Você pode enviar vários arquivos ao mesmo tempo.\n- Se enviar mais de um arquivo, o download será entregue em um ZIP.\n- Os arquivos resultantes terão o sufixo `_LIMPO.xlsx`.")
 
-uploaded_files = st.file_uploader("Escolha os arquivos (.xls / .xlsx)", type=['xls', 'xlsx'], accept_multiple_files=True)
+uploaded_files = st.file_uploader("Escolha os arquivos (.xls)", type=['xls', 'xlsx'], accept_multiple_files=True)
 
 col1, col2 = st.columns([3,1])
 with col2:
@@ -188,3 +188,4 @@ else:
         st.info("Nenhum arquivo carregado ainda.")
 
 # Fim do arquivo
+
